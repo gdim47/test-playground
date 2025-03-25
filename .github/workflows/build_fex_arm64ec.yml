@@ -59,24 +59,29 @@ jobs:
           name: Builder rootfs images
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      - name: dummy step
+        run: echo "dummy step"
       - name: debug output
         run: |
+          echo ${{ steps.fex_checkout.outputs.commit }}
+      - name: Load builder image
+        run: |
+          docker load --input ${{ runner.temp }}/wine_builder_rootfs.tar.xz
+      - name: Run build container
+        run: >
+          docker run --name builder 
+          -v ${{ github.workspace }}:/workdir
+          -e FEX_REPO=${{ env.FEX_REPO }} -e FEX_TAG=${{ env.FEX_TAG }}
+          -e FEX_REF=${{ steps.fex_checkout.outputs.commit }}
+          --entrypoint=/create_fex_archive.sh
+          wine_builder_rootfs
+      - name: debug output 2
+        run: |
           echo ${{ toJson(steps.fex_checkout) }}
-
-          # - name: Load builder image
-          #   run: |
-          #     docker load --input ${{ runner.temp }}/wine_builder_rootfs.tar.xz
-          # - name: Run build container
-          #   run: >
-          #     docker run --name builder 
-          #     -v ${{ github.workspace }}:/workdir
-          #     -e FEX_REPO=${{ env.FEX_REPO }} -e FEX_TAG=${{ env.FEX_TAG }}
-          #     -e FEX_REF=${{ steps.fex_checkout.outputs.commit }}
-          #     --entrypoint=/create_fex_archive.sh
-          #     wine_builder_rootfs
-          # - name: Upload artifact
-          #   uses: actions/upload-artifact@v4
-          #   with:
-          #     if-no-files-found: error
-          #     name: FEX-${{ env.FEX_TAG }}-${{ steps.fex_checkout.outputs.commit }}
-          #     path: ./prefix-${{ env.FEX_TAG }}-${{ steps.fex_checkout.outputs.commit }}
+          echo ${{ steps.fex_checkout.outputs.commit }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: FEX-${{ env.FEX_TAG }}-${{ steps.fex_checkout.outputs.commit }}
+          path: ./prefix-${{ env.FEX_TAG }}-${{ steps.fex_checkout.outputs.commit }}
