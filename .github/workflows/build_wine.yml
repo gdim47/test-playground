@@ -24,18 +24,18 @@ jobs:
           echo "matrix_arch=${MATRIX_ARCH}" >> $GITHUB_OUTPUT
           echo "matrix_config=${MATRIX_CONFIG}" >> $GITHUB_OUTPUT
 
-  build-wine:
-    needs: [ matrix ]
-    strategy:
-      matrix:
-        arch: ${{ fromJson(needs.matrix.outputs.matrix_arch) }}
-        config: ${{ fromJson(needs.matrix.outputs.matrix_config) }}
-    name: Build wine ${{ matrix.arch }} for ${{ matrix.config.environment }}
-    uses: ./.github/workflows/build_wine_arch.yml
-    with:
-      wine_arch: ${{ matrix.arch }}
-      wine_interpreter: ${{ matrix.config.interpreter_path }}
-      run_environment: ${{ matrix.config.environment }}
+  #  build-wine:
+  #    needs: [ matrix ]
+  #    strategy:
+  #      matrix:
+  #        arch: ${{ fromJson(needs.matrix.outputs.matrix_arch) }}
+  #        config: ${{ fromJson(needs.matrix.outputs.matrix_config) }}
+  #    name: Build wine ${{ matrix.arch }} for ${{ matrix.config.environment }}
+  #    uses: ./.github/workflows/build_wine_arch.yml
+  #    with:
+  #      wine_arch: ${{ matrix.arch }}
+  #      wine_interpreter: ${{ matrix.config.interpreter_path }}
+  #      run_environment: ${{ matrix.config.environment }}
   
   build-dxvk:
     needs: [ matrix ]
@@ -50,30 +50,32 @@ jobs:
       vk_lib_repo: "doitsujin/dxvk"
       vk_lib_tag: "v2.4.1"
 
-  build-vkd3d-proton:
-    needs: [ matrix ]
-    strategy:
-      matrix:
-        arch: ${{ fromJson(needs.matrix.outputs.matrix_arch) }}
-    name: Build vkd3d-proton ${{ matrix.arch }} 
-    uses: ./.github/workflows/build_vk_lib.yml
-    with:
-      vk_lib_name: "vkd3d-proton"
-      vk_lib_arch: ${{ matrix.arch }}
-      vk_lib_repo: "HansKristian-Work/vkd3d-proton"
-      vk_lib_tag: "v2.14.1"
+#  build-vkd3d-proton:
+#    needs: [ matrix ]
+#    strategy:
+#      matrix:
+#        arch: ${{ fromJson(needs.matrix.outputs.matrix_arch) }}
+#    name: Build vkd3d-proton ${{ matrix.arch }} 
+#    uses: ./.github/workflows/build_vk_lib.yml
+#    with:
+#      vk_lib_name: "vkd3d-proton"
+#      vk_lib_arch: ${{ matrix.arch }}
+#      vk_lib_repo: "HansKristian-Work/vkd3d-proton"
+#      vk_lib_tag: "v2.14.1"
  
-  build-fex-arm64ec:
-    name: Build FEX arm64ec
-    uses: ./.github/workflows/build_fex_arm64ec.yml
-    with:
-      fex_repo: "FEX-Emu/FEX"
-      fex_tag: "main"
+#  build-fex-arm64ec:
+#    name: Build FEX arm64ec
+#    uses: ./.github/workflows/build_fex_arm64ec.yml
+#    with:
+#      fex_repo: "FEX-Emu/FEX"
+#      fex_tag: "main"
 
   wcp-packaging:
     runs-on: ubuntu-24.04
-    needs: [ matrix, build-wine, build-dxvk, build-vkd3d-proton, build-fex-arm64ec ]
+      # needs: [ matrix, build-wine, build-dxvk, build-vkd3d-proton, build-fex-arm64ec ]
+    needs: [ matrix, build-dxvk ]
     strategy:
+      fail-fast: false
       matrix:
         arch: ${{ fromJson(needs.matrix.outputs.matrix_arch) }}
         config: ${{ fromJson(needs.matrix.outputs.matrix_config) }}
@@ -81,20 +83,43 @@ jobs:
           - config: { "environment": "generic", "intepreter_path": "" }
     name: Create wcp image ${{ matrix.arch }}
     steps:
-      - name: Download wine artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build-wine.outputs[format('{0}-{1}', matrix.arch, matrix.config.environment)].wine_artifact_name }}
+      # - name: Download wine artifact
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: ${{ needs.build-wine.outputs[format('{0}-{1}', matrix.arch, matrix.config.environment)].wine_artifact_name }}
       - name: Download dxvk artifact
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build-dxvk.outputs[matrix.arch].vk_lib_artifact_name }}
-      - name: Download vkd3d-proton artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build-vkd3d-proton.outputs[matrix.arch].vk_lib_artifact_name }}
+          path: artifact-libs
+      # - name: Download vkd3d-proton artifact
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: ${{ needs.build-vkd3d-proton.outputs[matrix.arch].vk_lib_artifact_name }}
+      #     path: artifact-libs
       - name: Download FEX arm64ec artifact
         if: matrix.arch == 'arm64ec'
         uses: actions/download-artifact@v4
         with:
           name: ${{ needs.build-fex-arm64ec.outputs.fex_artifact_name }}
+          path: artifact-libs
+      - name: Show directory and artifact name
+        run: |
+          ls -la .
+          tree artifact-libs
+          echo "json dump:"
+          echo "${{ toJson(needs.build-dxvk.outputs) }}"
+          
+          # echo "dxvk:"
+          # echo  ${{ needs.build-dxvk.outputs[matrix.arch].vk_lib_artifact_name }}
+          # echo "fex:"
+          # echo  ${{ needs.build-fex-arm64ec.outputs.fex_artifact_name }}
+      - name: Merge artifacts
+        run: |
+          mkdir -p result/lib/wine/aarch64-windows
+          echo -n -e "\xde\xad" >> result/lib/wine/aarch64-windows/d3d8.dll
+          echo "before:"
+          head -c 10 result/lib/wine/aarch64-windows/d3d8.dll | xxd -
+          find `pwd`/artifact-libs/ -mindepth 2 -maxdepth 2 -type d -exec cp -r --update=all {} `pwd`/result \;
+          echo "after:"
+          head -c 10 result/lib/wine/aarch64-windows/d3d8.dll | xxd -
