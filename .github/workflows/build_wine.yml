@@ -34,7 +34,7 @@ jobs:
     uses: ./.github/workflows/build_wine_arch.yml
     with:
       wine_arch: ${{ matrix.arch }}
-      wine_interpreter: ${{ matrix.config.interpreter_path }}
+      wine_interpreter: ${{ contains(matrix.config.exclude_interpreter_for_arch, matrix.arch) && '' || matrix.config.interpreter_path }}
       run_environment: ${{ matrix.config.environment }}
   
   build-dxvk:

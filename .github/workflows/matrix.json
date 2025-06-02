@@ -3,11 +3,18 @@
   "config": [
     {
         "environment": "generic",
-        "intepreter_path": ""
+        "intepreter_path": "",
+        "exclude_interpreter_for_arch": []
     },
     {
-        "environment": "winlator",
-        "interpreter_path": "/data/data/com.winlator/files/rootfs/lib/ld-linux-aarch64.so.1"
+        "environment": "winlator-arm64ec",
+        "interpreter_path": "/data/data/com.winlator/files/rootfs/lib/ld-linux-aarch64.so.1",
+        "exclude_interpreter_for_arch": [ "x86" ]
+    },
+    {
+        "environment": "winlator-x86",
+        "interpreter_path": "/lib64",
+        "exclude_interpreter_for_arch": [ "arm64ec" ]
     }
   ]
 }
